@@ -1,9 +1,22 @@
 
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { FoodAnalysis, AgentDecision, UserProfile, MealRecord, DietGoal } from "../types";
+import { GoogleGenAI, Type } from "@google/genai";
+import { FoodAnalysis, AgentDecision, UserProfile, MealRecord } from "../types";
 
-// Note: API Key is handled by the environment variable
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+/**
+ * Safely retrieves the API key from potential global locations.
+ * Prevents ReferenceError: process is not defined.
+ */
+const getApiKey = (): string => {
+  try {
+    // Check window.process (our shim) or the native process if it exists
+    const envKey = (window as any).process?.env?.API_KEY || (typeof process !== 'undefined' ? process.env.API_KEY : '');
+    return envKey || "";
+  } catch (e) {
+    return "";
+  }
+};
+
+const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 /**
  * Analyzes an image of food to extract nutritional information.
@@ -48,7 +61,8 @@ export async function analyzeFoodImage(base64Image: string): Promise<FoodAnalysi
     }
   });
 
-  return JSON.parse(response.text || "{}") as FoodAnalysis;
+  const text = response.text || "{}";
+  return JSON.parse(text) as FoodAnalysis;
 }
 
 /**
@@ -102,5 +116,6 @@ export async function getAgentDecision(
     }
   });
 
-  return JSON.parse(response.text || "{}") as AgentDecision;
+  const text = response.text || "{}";
+  return JSON.parse(text) as AgentDecision;
 }

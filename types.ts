@@ -30,12 +30,6 @@ export interface MealRecord {
   image?: string;
 }
 
-export interface AgentObservation {
-  timestamp: number;
-  type: 'MEAL' | 'EXERCISE' | 'GOAL_UPDATE';
-  content: string;
-}
-
 export interface AgentDecision {
   status: 'OPTIMAL' | 'WARNING' | 'CRITICAL';
   reasoning: string;
@@ -43,8 +37,9 @@ export interface AgentDecision {
 }
 
 export interface UserProfile {
-  name: string;
+  username: string;
   goal: DietGoal;
   dailyCalorieTarget: number;
   dailyProteinTarget: number;
+  lastActiveDate?: string; // Used for daily reset check
 }

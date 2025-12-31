@@ -15,6 +15,17 @@
       -webkit-backdrop-filter: blur(10px);
     }
   </style>
+  <script>
+    /** 
+     * Shim for process.env to prevent crashes in local browser environments
+     * where 'process' is not defined.
+     */
+    window.process = {
+      env: {
+        API_KEY: "" 
+      }
+    };
+  </script>
 <script type="importmap">
 {
   "imports": {
@@ -29,6 +40,16 @@
 </script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="root"></div>
+  <div id="root">
+    <!-- Initial loading state visible before React mounts -->
+    <div class="flex items-center justify-center min-h-screen">
+      <div class="text-center">
+        <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p class="text-slate-500 font-medium">Initializing AI Agent...</p>
+      </div>
+    </div>
+  </div>
+  <!-- Explicitly load the application module -->
+  <script type="module" src="index.tsx"></script>
 </body>
 </html>
