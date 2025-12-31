@@ -1,0 +1,7 @@
+{
+  "name": "Smart Food AI & Diet Agent",
+  "description": "An end-to-end AI application that recognizes food from images and provides agentic, adaptive diet planning using Gemini 3 Vision and Reasoning.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
