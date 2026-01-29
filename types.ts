@@ -34,12 +34,18 @@ export interface AgentDecision {
   status: 'OPTIMAL' | 'WARNING' | 'CRITICAL';
   reasoning: string;
   suggestion: string;
+  suggestedRecipes?: Array<{title: string, uri: string}>;
 }
 
 export interface UserProfile {
   username: string;
   goal: DietGoal;
+  age: number;
+  weight: number; // in kg
+  height: number; // in cm
+  gender: 'male' | 'female';
+  activityLevel: 1.2 | 1.375 | 1.55 | 1.725 | 1.9; // Sedentary to Extra Active
   dailyCalorieTarget: number;
   dailyProteinTarget: number;
-  lastActiveDate?: string; // Used for daily reset check
+  lastActiveDate?: string;
 }
