@@ -3,7 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { FoodAnalysis, AgentDecision, UserProfile, MealRecord } from "../types";
 
 const getApiKey = (): string => {
-  // Use a more robust check for the environment variable
   const key = process.env.API_KEY;
   return key || "";
 };
@@ -11,18 +10,22 @@ const getApiKey = (): string => {
 const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 /**
- * High-precision vision analysis.
- * Identifies specific species and cooking methods to ensure accurate calorie/protein categorization.
+ * High-precision multimodal vision analysis.
+ * Combines image data with user-provided descriptions for extreme accuracy.
  */
-export async function analyzeFoodImage(base64Image: string): Promise<FoodAnalysis> {
+export async function analyzeFoodImage(base64Image: string, userDescription?: string): Promise<FoodAnalysis> {
   const ai = getAI();
   const model = "gemini-3-flash-preview";
 
+  const descriptionPart = userDescription ? `The user provided this additional context: "${userDescription}". ` : "";
+
   const prompt = `Perform a high-precision nutritional analysis on this image. 
+  ${descriptionPart}
+  
   1. Identify the specific food item. 
-  2. If it is fish, identify the exact variety/species (e.g., Salmon, Cod, Tilapia, Catfish).
+  2. If it is fish, identify the exact variety/species (e.g., Salmon, Cod, Tilapia, Catfish). If the user provided a description, prioritize their input.
   3. Identify the preparation method (e.g., Deep Fried, Pan Seared, Grilled, Breaded).
-  4. Categorize Calories, Protein, Carbs, and Fat based on that specific variety and preparation.
+  4. Categorize Calories, Protein, Carbs, and Fat based on the variety and preparation.
   5. Provide the results strictly in JSON format.`;
 
   const response = await ai.models.generateContent({
@@ -60,16 +63,11 @@ export async function analyzeFoodImage(base64Image: string): Promise<FoodAnalysi
   return JSON.parse(response.text || "{}") as FoodAnalysis;
 }
 
-/**
- * Strategic Audit Engine.
- * Cross-references daily logs with biometric targets.
- */
 export async function getAgentDecision(
   profile: UserProfile,
   history: MealRecord[]
 ): Promise<AgentDecision> {
   const ai = getAI();
-  // Using Flash for faster turn-around in the dashboard, but Pro-preview is also valid.
   const model = "gemini-3-flash-preview"; 
 
   const totalCalories = history.reduce((sum, m) => sum + m.nutrition.calories, 0);
@@ -117,7 +115,6 @@ export async function getAgentDecision(
       uri: chunk.web.uri
     })).slice(0, 3);
 
-  // More robust matching for the required format
   const status = text.match(/STATUS:\s*(\w+)/i)?.[1]?.toUpperCase() || "OPTIMAL";
   const reasoning = text.match(/REASONING:\s*([^\n]+)/i)?.[1] || "Maintaining baseline metabolic efficiency.";
   const suggestion = text.match(/ACTION:\s*([^\n]+)/i)?.[1] || "Proceed with standard nutritional schedule.";

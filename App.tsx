@@ -32,7 +32,8 @@ import {
   Info,
   Activity,
   Award,
-  Sparkles
+  Sparkles,
+  Utensils
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -51,6 +52,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [analyzedFood, setAnalyzedFood] = useState<FoodAnalysis | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [userDescription, setUserDescription] = useState('');
   const [agentFeedback, setAgentFeedback] = useState<AgentDecision | null>(null);
   const [isAgentThinking, setIsAgentThinking] = useState(false);
   
@@ -111,21 +113,28 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLoading(true);
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1];
+    reader.onloadend = () => {
       setImagePreview(reader.result as string);
-      try {
-        const analysis = await analyzeFoodImage(base64);
-        setAnalyzedFood(analysis);
-      } catch (err) { console.error(err); } 
-      finally { setLoading(false); }
     };
     reader.readAsDataURL(file);
+  };
+
+  const startAnalysis = async () => {
+    if (!imagePreview) return;
+    setLoading(true);
+    try {
+      const base64 = imagePreview.split(',')[1];
+      const analysis = await analyzeFoodImage(base64, userDescription);
+      setAnalyzedFood(analysis);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const totals = meals.reduce((acc, m) => ({
@@ -208,7 +217,7 @@ const App: React.FC = () => {
                 <MessageSquare size={20} className="text-slate-400" />
                 <div className="absolute top-3 right-3 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
              </button>
-             <button onClick={() => setIsCapturing(true)} className="flex items-center gap-3 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-sm hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
+             <button onClick={() => {setIsCapturing(true); setImagePreview(null); setAnalyzedFood(null); setUserDescription('');}} className="flex items-center gap-3 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-sm hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
                 <Plus size={20} /> ADD INPUT
              </button>
           </div>
@@ -467,27 +476,55 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Input Modal */}
+      {/* Multimodal Capture Modal */}
       {isCapturing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
            <div className="absolute inset-0 bg-[#0a0a0a]/95 backdrop-blur-2xl" onClick={() => setIsCapturing(false)} />
-           <div className="max-w-2xl w-full bg-[#141414] border border-white/10 rounded-[3rem] p-10 relative z-10 shadow-2xl animate-in zoom-in-95 duration-300">
-              <div className="flex justify-between items-center mb-10">
-                 <h3 className="text-2xl font-black text-white tracking-tighter">MULTIMODAL VISION</h3>
+           <div className="max-w-3xl w-full bg-[#141414] border border-white/10 rounded-[3rem] p-10 relative z-10 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="flex justify-between items-center mb-8">
+                 <h3 className="text-2xl font-black text-white tracking-tighter">MULTIMODAL CAPTURE</h3>
                  <button onClick={() => setIsCapturing(false)} className="p-3 text-slate-500 hover:text-white transition-colors"><X size={32} /></button>
               </div>
 
               {!analyzedFood && !loading ? (
-                <div className="flex flex-col items-center py-16">
-                   <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mb-8 border border-white/10 shadow-inner"><Camera size={48} className="text-indigo-500" /></div>
-                   <p className="text-slate-400 mb-10 text-center max-w-sm font-medium">Initiate bio-scan for meal identification.variety, prep, and nutritional payload will be audited.</p>
-                   <button onClick={() => fileInputRef.current?.click()} className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black tracking-widest uppercase text-xs shadow-xl hover:bg-indigo-500 transition-all active:scale-95">START BIO-SCAN</button>
-                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleCapture} />
+                <div className="space-y-10">
+                   {!imagePreview ? (
+                      <div className="flex flex-col items-center py-16">
+                         <div className="w-24 h-24 bg-white/5 rounded-[2.5rem] flex items-center justify-center mb-8 border border-white/10 shadow-inner"><Camera size={48} className="text-indigo-500" /></div>
+                         <p className="text-slate-400 mb-10 text-center max-w-sm font-medium">Input meal data via multimodal scan.variety, prep, and nutritional payload will be audited.</p>
+                         <button onClick={() => fileInputRef.current?.click()} className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black tracking-widest uppercase text-xs shadow-xl hover:bg-indigo-500 transition-all active:scale-95">UPLOAD FOOD PHOTO</button>
+                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                      </div>
+                   ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                         <div className="space-y-6">
+                            <div className="rounded-[2rem] overflow-hidden border-4 border-white/5 shadow-2xl bg-black aspect-square">
+                               <img src={imagePreview} className="w-full h-full object-cover" />
+                            </div>
+                            <button onClick={() => setImagePreview(null)} className="w-full py-4 text-slate-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-colors">REMOVE PHOTO</button>
+                         </div>
+                         <div className="flex flex-col justify-center space-y-8">
+                            <div>
+                               <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3 block">SPECIFY VARIETY / PREPARATION (OPTIONAL)</label>
+                               <textarea 
+                                 value={userDescription}
+                                 onChange={e => setUserDescription(e.target.value)}
+                                 placeholder="e.g. 'Fried Tilapia fish', 'Pan-seared Salmon with olive oil', 'Deep fried cod fish fry'..."
+                                 className="w-full h-32 p-5 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:border-indigo-500 transition-all font-bold text-sm tracking-tight placeholder:text-slate-700 resize-none"
+                               />
+                               <p className="text-[10px] text-slate-600 mt-2 font-medium italic">Adding specific details helps the AI categorize nutrients more accurately.</p>
+                            </div>
+                            <button onClick={startAnalysis} className="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black tracking-widest uppercase text-sm shadow-xl hover:bg-indigo-500 transition-all active:scale-95 flex items-center justify-center gap-3">
+                               <Sparkles size={20} /> START ANALYSIS
+                            </button>
+                         </div>
+                      </div>
+                   )}
                 </div>
               ) : analyzedFood && !loading ? (
                 <div className="space-y-8 animate-in slide-in-from-bottom-5">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {imagePreview && <div className="rounded-[2rem] overflow-hidden border-4 border-white/5 shadow-2xl"><img src={imagePreview} className="w-full h-64 object-cover" /></div>}
+                      {imagePreview && <div className="rounded-[2rem] overflow-hidden border-4 border-white/5 shadow-2xl bg-black aspect-square"><img src={imagePreview} className="w-full h-full object-cover" /></div>}
                       <div className="flex flex-col justify-center">
                          <div className="text-3xl font-black text-white mb-2 leading-tight tracking-tighter">{analyzedFood.foodName}</div>
                          <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-[0.4em] mb-8 flex items-center gap-2"><Award size={14} /> SCAN CONFIRMED: {Math.round(analyzedFood.confidence * 100)}%</div>
@@ -500,18 +537,30 @@ const App: React.FC = () => {
                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">PROTEIN</div>
                                <div className="text-xl font-black text-white">{analyzedFood.nutrition.protein}g</div>
                             </div>
+                            <div className="p-5 bg-white/5 rounded-[1.5rem] border border-white/5">
+                               <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">CARBS</div>
+                               <div className="text-xl font-black text-white">{analyzedFood.nutrition.carbs}g</div>
+                            </div>
+                            <div className="p-5 bg-white/5 rounded-[1.5rem] border border-white/5">
+                               <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">FAT</div>
+                               <div className="text-xl font-black text-white">{analyzedFood.nutrition.fat}g</div>
+                            </div>
                          </div>
                       </div>
                    </div>
-                   <button onClick={() => {
-                     const m: MealRecord = { id: crypto.randomUUID(), timestamp: Date.now(), foodName: analyzedFood.foodName, nutrition: analyzedFood.nutrition, image: imagePreview || undefined };
-                     setMeals([...meals, m]); setAnalyzedFood(null); setImagePreview(null); setIsCapturing(false);
-                   }} className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black text-sm tracking-widest uppercase shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">COMMIT TO BIO-SEQUENCE</button>
+                   <div className="flex gap-4">
+                      <button onClick={() => setAnalyzedFood(null)} className="flex-1 py-6 bg-white/5 text-slate-500 rounded-[2rem] font-black text-sm tracking-widest uppercase hover:text-white transition-all">RE-SCAN</button>
+                      <button onClick={() => {
+                        const m: MealRecord = { id: crypto.randomUUID(), timestamp: Date.now(), foodName: analyzedFood.foodName, nutrition: analyzedFood.nutrition, image: imagePreview || undefined };
+                        setMeals([...meals, m]); setAnalyzedFood(null); setImagePreview(null); setIsCapturing(false);
+                      }} className="flex-[2] py-6 bg-emerald-600 text-white rounded-[2rem] font-black text-sm tracking-widest uppercase shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">COMMIT TO BIO-SEQUENCE</button>
+                   </div>
                 </div>
               ) : (
                 <div className="py-24 flex flex-col items-center">
                    <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                   <p className="font-black text-white mt-8 tracking-[0.4em] uppercase text-[10px]">Decoding Biological Structure...</p>
+                   <p className="font-black text-white mt-8 tracking-[0.4em] uppercase text-[10px]">Decoding Multimodal Structure...</p>
+                   <p className="text-[10px] text-slate-600 mt-2 font-medium">Analyzing variety and preparation methods...</p>
                 </div>
               )}
            </div>
