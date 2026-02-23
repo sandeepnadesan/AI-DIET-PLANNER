@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { FoodAnalysis, AgentDecision, UserProfile, MealRecord } from "../types";
+import { FoodAnalysis, AgentDecision, UserProfile, MealRecord, Language } from "../types";
 
 const getApiKey = (): string => {
   const key = process.env.API_KEY;
@@ -11,9 +11,13 @@ const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 /**
  * High-precision multimodal vision analysis.
- * Combines image data with user-provided descriptions for extreme accuracy.
+ * Uses government-standard nutritional data (USDA/WHO guidelines) for estimation.
  */
-export async function analyzeFoodImage(base64Image: string, userDescription?: string): Promise<FoodAnalysis> {
+export async function analyzeFoodImage(
+  base64Image: string, 
+  userDescription?: string,
+  lang: Language = Language.ENGLISH
+): Promise<FoodAnalysis> {
   const ai = getAI();
   const model = "gemini-3-flash-preview";
 
@@ -22,11 +26,15 @@ export async function analyzeFoodImage(base64Image: string, userDescription?: st
   const prompt = `Perform a high-precision nutritional analysis on this image. 
   ${descriptionPart}
   
+  CRITICAL INSTRUCTIONS:
   1. Identify the specific food item. 
-  2. If it is fish, identify the exact variety/species (e.g., Salmon, Cod, Tilapia, Catfish). If the user provided a description, prioritize their input.
-  3. Identify the preparation method (e.g., Deep Fried, Pan Seared, Grilled, Breaded).
-  4. Categorize Calories, Protein, Carbs, and Fat based on the variety and preparation.
-  5. Provide the results strictly in JSON format.`;
+  2. Use official government nutritional databases (like USDA FoodData Central or WHO standards) as the primary reference for all estimations.
+  3. If it is fish, identify the exact variety/species (e.g., Salmon, Cod, Tilapia, Catfish). If the user provided a description, prioritize their input.
+  4. Identify the preparation method (e.g., Deep Fried, Pan Seared, Grilled, Breaded).
+  5. Categorize Calories, Protein, Carbs, and Fat based on the variety and preparation.
+  6. Provide the results strictly in JSON format.
+  7. Ensure the foodName is descriptive and accurate.
+  8. Language for foodName: ${lang === Language.TAMIL ? 'Tamil' : lang === Language.FRENCH ? 'French' : 'English'}.`;
 
   const response = await ai.models.generateContent({
     model,
@@ -41,7 +49,7 @@ export async function analyzeFoodImage(base64Image: string, userDescription?: st
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          foodName: { type: Type.STRING, description: "Detailed name, e.g., 'Golden Fried Cod Fillet'" },
+          foodName: { type: Type.STRING, description: "Detailed name" },
           isFood: { type: Type.BOOLEAN },
           confidence: { type: Type.NUMBER },
           nutrition: {
@@ -65,7 +73,8 @@ export async function analyzeFoodImage(base64Image: string, userDescription?: st
 
 export async function getAgentDecision(
   profile: UserProfile,
-  history: MealRecord[]
+  history: MealRecord[],
+  lang: Language = Language.ENGLISH
 ): Promise<AgentDecision> {
   const ai = getAI();
   const model = "gemini-3-flash-preview"; 
@@ -78,14 +87,15 @@ export async function getAgentDecision(
   Daily Target: ${profile.dailyCalorieTarget}kcal, ${profile.dailyProteinTarget}g Protein.
   
   Your Task:
-  - Perform a 'Gap Analysis' on current intake.
+  - Perform a 'Gap Analysis' on current intake based on WHO/USDA nutritional standards.
   - Suggest a SPECIFIC meal or snack to balance the day's macros.
   - Use Google Search tool to find highly-rated recipe links if needed.
+  - RESPONSE LANGUAGE: ${lang === Language.TAMIL ? 'Tamil' : lang === Language.FRENCH ? 'French' : 'English'}.
 
   Format:
   STATUS: [OPTIMAL/WARNING/CRITICAL]
-  REASONING: [1 sentence analysis]
-  ACTION: [Specific tactical instruction]`;
+  REASONING: [1 sentence analysis in ${lang}]
+  ACTION: [Specific tactical instruction in ${lang}]`;
 
   const mealSummary = history.length > 0 
     ? history.map(m => `- ${m.foodName}: ${m.nutrition.calories}cal, ${m.nutrition.protein}g protein`).join('\n')
@@ -115,14 +125,14 @@ export async function getAgentDecision(
       uri: chunk.web.uri
     })).slice(0, 3);
 
-  const status = text.match(/STATUS:\s*(\w+)/i)?.[1]?.toUpperCase() || "OPTIMAL";
-  const reasoning = text.match(/REASONING:\s*([^\n]+)/i)?.[1] || "Maintaining baseline metabolic efficiency.";
-  const suggestion = text.match(/ACTION:\s*([^\n]+)/i)?.[1] || "Proceed with standard nutritional schedule.";
+  const statusMatch = text.match(/STATUS:\s*(\w+)/i);
+  const reasoningMatch = text.match(/REASONING:\s*([^\n]+)/i);
+  const actionMatch = text.match(/ACTION:\s*([^\n]+)/i);
 
   return {
-    status: (status as any),
-    reasoning,
-    suggestion,
+    status: (statusMatch?.[1]?.toUpperCase() as any) || "OPTIMAL",
+    reasoning: reasoningMatch?.[1] || "Maintaining baseline metabolic efficiency.",
+    suggestion: actionMatch?.[1] || "Proceed with standard nutritional schedule.",
     suggestedRecipes
   };
 }
@@ -130,7 +140,8 @@ export async function getAgentDecision(
 export async function askAgent(
   profile: UserProfile,
   history: MealRecord[],
-  question: string
+  question: string,
+  lang: Language = Language.ENGLISH
 ): Promise<string> {
   const ai = getAI();
   const model = "gemini-3-flash-preview";
@@ -138,8 +149,17 @@ export async function askAgent(
   const totalCalories = history.reduce((sum, m) => sum + m.nutrition.calories, 0);
   const systemInstruction = `You are the STRATOS Personal Diet Agent. 
   Answer the user's question about their diet, exercise, or cravings based on their current status.
+  Use official nutritional data standards (USDA/WHO) for all advice.
   User Goal: ${profile.goal}. 
-  Intake so far: ${totalCalories} kcal.`;
+  Intake so far: ${totalCalories} kcal.
+  
+  LANGUAGE PROTOCOL:
+  1. Detect the language and style of the user's input.
+  2. Respond in the EXACT SAME language and style as the user.
+  3. If the user uses "Tanglish" (Tamil words written in English/Latin script), you MUST respond in Tanglish.
+  4. If the user uses English, respond in English.
+  5. If the user uses Tamil script, respond in Tamil script.
+  6. The default UI language is ${lang === Language.TAMIL ? 'Tamil' : lang === Language.FRENCH ? 'French' : 'English'}, but user input style takes precedence.`;
 
   const response = await ai.models.generateContent({
     model,
@@ -149,3 +169,4 @@ export async function askAgent(
 
   return response.text || "Communication relay failure. Verify API connection.";
 }
+

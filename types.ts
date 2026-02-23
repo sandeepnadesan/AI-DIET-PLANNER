@@ -1,4 +1,15 @@
 
+export enum Language {
+  ENGLISH = 'en',
+  TAMIL = 'ta',
+  FRENCH = 'fr'
+}
+
+export enum Theme {
+  DARK = 'dark',
+  LIGHT = 'light'
+}
+
 export enum DietGoal {
   WEIGHT_LOSS = 'Weight Loss',
   MUSCLE_GAIN = 'Muscle Gain',
